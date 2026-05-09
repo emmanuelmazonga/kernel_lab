@@ -135,11 +135,79 @@ int first_fit_allocate(int size, int pid) {
     return -1; // allocation failed
 }
 
+// Memory Deallocation
+void free_memory(int pid) {
+    //Loop through mem_blocks[] until block owned by pid is located
+    int index = -1;
+    for (int i = 0; i < count_block; i++) {
+        if (mem_blocks[i].pid == pid){
+            index = i;
+            break;
+        }
+    }
+    if ( index == -1){  // PID not found
+        return; 
+    }
+    mem_blocks[index].pid = -1; // mark block as free
+
+    // Merge with NEXT block if free
+    if (index + 1 < count_block && mem_blocks[index + 1].pid == -1) {
+        mem_blocks[index].size += mem_blocks[index + 1].size;
+        for (int j = index + 1; j < count_block - 1; j++){
+            mem_blocks[j] = mem_blocks[j + 1];
+        }
+        count_block--;
+    }
+
+    // Merge with PREVIOUS block if free
+    if (index > 0 && mem_blocks[index - 1].pid == -1) { // mem_blocks[index - 1].pid == -1 → checks if that previous block is free
+        mem_blocks[index - 1].size += mem_blocks[index].size;
+        for (int j = index; j < count_block - 1; j++)
+            mem_blocks[j] = mem_blocks[j + 1];
+        count_block--; //Decrement count_block since two blocks became one.
+    }
+}
+
+// DISPLAY HELPERS
 
 
 
 
 
 int main() {
+
+    init_memory();
+    add_log("===== Emergency Response System Started G84 ====");
+    add_log("TOtal Available Memory: % KB", MAX_MEMORY);
+
+    int option;
+    do {
+        print_menu();
+        if (scanf("%d", &option != 1))
+            break;
+        switch (option) {
+            case 1:  create_task();         
+                break;
+            case 2:  print_process_table(); 
+                break;
+            case 3:  print_memory_map();    
+                break;
+            case 4:  run_fcfs();            
+                break;
+            case 5:  run_priority();        
+                break;
+            case 6:  suspend_task();        
+                break;
+            case 7:  terminate_task();      
+                break;
+            case 8:  view_logs();           
+                break;
+            case 9:  clear_logs();          
+                break;
+            case 10: add_log("Exiting SERC. Goodbye."); 
+                break;
+            default: printf("Invalid choice. Try again.\n");
+        }
+    } while(option != 10);
     return 0;
 }
