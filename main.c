@@ -209,6 +209,28 @@ void clear_logs(void) {
     printf("[FILE] Log cleared.\n");
 }
 
+                                // MENU
+void display_menu(void) {
+    printf("\n======================================================\n");
+    printf("              Emergency Response System G84              ");
+    printf("======================================================\n");
+    printf("  [Process Management]\n");
+    printf("  1. Create Emergency Task\n");
+    printf("  2. Show Process Table\n");
+    printf("  6. Suspend Task\n");
+    printf("  7. Terminate Task\n");
+    printf("\n  [CPU Scheduling]\n");
+    printf("  4. Run FCFS Scheduling\n");
+    printf("  5. Run Priority Scheduling\n");
+    printf("\n  [Memory Management]\n");
+    printf("  3. Show Memory Map\n");
+    printf("\n  [File Management]\n");
+    printf("  8. View Logs\n");
+    printf("  9. Clear Logs\n");
+    printf("\n 10. Exit\n");
+    printf("--------------------------------------------------------\n");
+    printf("Option: ");
+}
 
 
 int main() {
@@ -219,7 +241,7 @@ int main() {
 
     int option;
     do {
-        print_menu();
+        display_menu();
         if (scanf("%d", &option != 1))
             break;
         switch (option) {
