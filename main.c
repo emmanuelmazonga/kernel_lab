@@ -248,7 +248,7 @@ void suspend_process(void) {
             add_log("[INFO] PID %d (%S) is already WAITING", pid, process_table[i].name);
             return;
         }
-        process_table[i].state == WAITING;
+        process_table[i].state = WAITING; // changes process state from running or ready to waiting
         add_log("SUSPENDED: PID %d (%s) -> WAITING", pid, process_table[i].name);
         // display_process_table
         return;
