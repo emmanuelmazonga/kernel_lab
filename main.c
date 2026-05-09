@@ -30,6 +30,7 @@ typedef struct {
     int burst_time;
     int priority;
     int remaining_time;
+    int memory_required;
     Process_state state;
     int memory_size;  // This stores how much memory (in KB) the process when requested 
     int memory_start; // This records the starting address of the memory block
@@ -169,6 +170,61 @@ void free_memory(int pid) {
 }
 
 // DISPLAY HELPERS ++
+void flush_input(void) {
+    int key_char; // discard characters until newline or end-of-file
+    while ((key_char = getchar()) != '\n' && key_char != EOF);
+}
+                             // PROCESS MANAGEMENT
+void create_process(void) {
+    if (process_count >= MAX_PROCESSES) {
+        add_log("[PROCESS ERROR] Maximum number of processes reached (%d).\n", MAX_PROCESSES);
+        return;
+    }     
+    PCB* p = &process_table[process_count];
+    int  arrival, burst, priority, memory;
+    
+    printf("Process Name: ");
+    flush_input();
+    fgets(p->name, NAME_MAX_LEN, stdin);
+    p->name[strcspn(p->name, "\n")] = '\0';   // remove newline
+
+    if (strlen(p->name) == 0) {
+        add_log("ERROR: Process name cannot be empty");
+        return;
+    }
+
+    
+    printf("Arrival Time: ");                                 
+    scanf("%d", &arrival);
+    printf("Burst Time: ");                                   
+    scanf("%d", &burst);
+    printf("Priority (1=Highest, 2=Emergency, 3=Lowest): "); 
+    scanf("%d", &priority);
+    printf("Memory (KB): ");                                  
+    scanf("%d", &memory);
+
+    p->pid        = next_pid++;
+    p->arrival_time   = arrival;
+    p->burst_time     = burst;
+    p->priority       = priority;
+    p->remaining_time = burst;
+    p->state          = NEW;
+    p->memory_size    = memory;
+
+    int start_addr = first_fit_allocate(memory, p->pid);
+    if (start_addr != -1){ // if it's not free
+        p->memory_start = start_addr;
+        p->state = READY;
+        add_log("\n[SUCCESSFUL] '%s' created — PID '%d' |— Memory at %d KB | State: READY\n",
+            p->name, p->pid, start_addr);
+    } else {
+        p->memory_start = -1;
+        add_log("WARNING: PID %d (%s) — Insufficient memory", p->pid, p->name);
+    }
+    process_count++;
+    //display processt table and memory map
+
+}                           
 
                              // FILE MANAGEMENT
 // reads and display the log file   
