@@ -174,7 +174,9 @@ void flush_input(void) {
     int key_char; // discard characters until newline or end-of-file
     while ((key_char = getchar()) != '\n' && key_char != EOF);
 }
-                             // PROCESS MANAGEMENT
+
+// PROCESS MANAGEMENT
+// Create Process with logging
 void create_process(void) {
     if (process_count >= MAX_PROCESSES) {
         add_log("[PROCESS ERROR] Maximum number of processes reached (%d).\n", MAX_PROCESSES);
