@@ -74,11 +74,11 @@ const char* state_to_string(Process_state state_value) {
 
                           // FILE MANAGEMENT
 // LOGGING
-void add_log(const char *message, ...) {
+void add_log(const char *_get_output_format, ...) {
     char message[500];        // buffer to hold the final message
     va_list args;             // special type for handling "..."
-    va_start(args, message);   // initialize args to start reading after 'format'
-    vsnprintf(message, sizeof(message), message, args); 
+    va_start(args, _get_output_format);   // initialize args to start reading after 'format'
+    vsnprintf(message, sizeof(message), _get_output_format, args); 
     va_end(args);             // clean up
 
     // Time handling
@@ -170,6 +170,39 @@ void free_memory(int pid) {
 }
 
 // DISPLAY HELPERS ++
+
+void display_process_table(void) {
+    printf("\n%-5s %-20s %-8s %-6s %-9s %-12s %-8s %-6s\n",
+           "PID", "Name", "Arrival", "Burst", "Priority", "State", "Mem(KB)", "Start");
+    printf("%-5s %-20s %-8s %-6s %-9s %-12s %-8s %-6s\n",
+           "---", "----", "-------", "-----", "--------", "-----", "-------", "-----");
+    for (int i = 0; i < process_count; i++) {
+        PCB *p = &process_table[i];
+        printf("%-5d %-20s %-8d %-6d %-9d %-12s %-8d %-6d\n",
+               p->pid, p->name, p->arrival_time, p->burst_time,
+               p->priority, state_to_string(p->state),
+               p->memory_size,
+               p->memory_start == -1 ? 0 : p->memory_start);
+    }
+    printf("\n");
+}
+
+void display_memory_map(void) {
+    int used = 0;
+    printf("\n%-12s %-10s %-12s %-5s\n", "Start (KB)", "Size (KB)", "Status", "PID");
+    printf("%-12s %-10s %-12s %-5s\n",   "----------", "---------", "------", "---");
+    for (int i = 0; i < count_block; i++) {
+        printf("%-12d %-10d %-12s %-5d\n",
+               mem_blocks[i].start,
+               mem_blocks[i].size,
+               mem_blocks[i].pid == -1 ? "FREE" : "ALLOCATED",
+               mem_blocks[i].pid == -1 ? 0 : mem_blocks[i].pid);
+        if (mem_blocks[i].pid != -1) used += mem_blocks[i].size;
+    }
+    printf("\nProcesses: %d | Used Memory: %d KB | Free Memory: %d KB\n\n",
+           process_count, used, MAX_MEMORY - used);
+}
+
 void flush_input(void) {
     int key_char; // discard characters until newline or end-of-file
     while ((key_char = getchar()) != '\n' && key_char != EOF);
@@ -224,7 +257,8 @@ void create_process(void) {
         add_log("WARNING: PID %d (%s) — Insufficient memory", p->pid, p->name);
     }
     process_count++;
-    //display processt table and memory map
+    display_process_table();
+    display_memory_map();
 
 } 
 
@@ -251,6 +285,7 @@ void suspend_process(void) {
         process_table[i].state = WAITING; // changes process state from running or ready to waiting
         add_log("SUSPENDED: PID %d (%s) -> WAITING", pid, process_table[i].name);
         // display_process_table
+        display_process_table();
         return;
     }
     add_log("[ERROR] PID %d not found", pid);
@@ -287,15 +322,30 @@ void terminate_process(void) {
         add_log("TERMINATED: PID %d (%s) removed from scheduler",
              pid, process_table[i].name);
         // display_process_table
+        display_process_table();
         //display_memory_map
+        display_memory_map();
     }
 }
                              // CPU SCHEDULING
+void fcfs_algo(void) {
+    if (process_count == 0) {
+        add_log("ERROR: No processes to schedule");
+        return;
+    }
+    add_log("========= FCFS SCHEDULING STARTED =========");
+
+
+}
+
+void priority_algo(void) {
+    return;
+}
 
                              // FILE MANAGEMENT
 // reads and display the log file   
 void view_logs(void) {
-    FILE* log_file = fopen(LOG_FILE, 'r');  // open log file in read mode'r'
+    FILE* log_file = fopen(LOG_FILE, "r");  // open log file in read mode'r'
     if (!log_file) {
         printf("[FILE ERROR] No Log file Found");
         return;
@@ -307,7 +357,7 @@ void view_logs(void) {
     int line_count = 0; // tracks how many lines are read
     // Read each line from the file into message_line
     while (fgets(message_line, sizeof(message_line), log_file)) {
-        printf("%S", message_line);
+        printf("%s", message_line);
         line_count++;
     }
     // if empty or show total events
@@ -364,14 +414,16 @@ int main() {
     int option;
     do {
         display_menu();
-        if (scanf("%d", &option != 1))
+        if (scanf("%d", &option) != 1) {
+            printf("Invalid input. Please enter a number.\n");
             break;
+        }
         switch (option) {
             case 1:  create_process();         
                 break;
-            case 2:  print_process_table(); 
+            case 2:  display_process_table(); 
                 break;
-            case 3:  print_memory_map();    
+            case 3:  display_memory_map();    
                 break;
             case 4:  fcfs_algo();            
                 break;
