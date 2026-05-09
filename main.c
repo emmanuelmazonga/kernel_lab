@@ -161,7 +161,7 @@ void free_memory(int pid) {
     }
 
     // Merge with PREVIOUS block if free
-    if (index > 0 && mem_blocks[index - 1].pid == -1) { // mem_blocks[index - 1].pid == -1 → checks if that previous block is free
+    if (index > 0 && mem_blocks[index - 1].pid == -1) { // mem_blocks[index - 1].pid == -1 -> checks if that previous block is free
         mem_blocks[index - 1].size += mem_blocks[index].size;
         for (int j = index; j < count_block - 1; j++)
             mem_blocks[j] = mem_blocks[j + 1];
@@ -250,11 +250,11 @@ void create_process(void) {
     if (start_addr != -1){ // if it's not free
         p->memory_start = start_addr;
         p->state = READY;
-        add_log("\n[SUCCESSFUL] '%s' created — PID '%d' |— Memory at %d KB | State: READY\n",
+        add_log("\n[SUCCESSFUL] '%s' created | PID '%d' | Memory at %d KB | State: READY\n",
             p->name, p->pid, start_addr);
     } else {
         p->memory_start = -1;
-        add_log("WARNING: PID %d (%s) — Insufficient memory", p->pid, p->name);
+        add_log("WARNING: PID %d (%s) | Insufficient memory", p->pid, p->name);
     }
     process_count++;
     display_process_table();
@@ -331,15 +331,145 @@ void terminate_process(void) {
 void fcfs_algo(void) {
     if (process_count == 0) {
         add_log("ERROR: No processes to schedule");
+        printf("Invalid input. Please create at least one process.\n");
         return;
     }
     add_log("========= FCFS SCHEDULING STARTED =========");
+
+    // making a scratch copy of your process table
+    PCB temp[MAX_PROCESSES];
+    // memcpy(destination, source, size_in_bytes);
+    memcpy(temp, process_table, sizeof(PCB) * process_count);
+
+    /* Sort by arrival time (bubble sort — small n, clarity preferred) */
+    for (int i = 0; i < process_count - 1; i++)
+        for (int j = 0; j < process_count - i - 1; j++)
+            if (temp[j].arrival_time > temp[j + 1].arrival_time) {
+                PCB sw = temp[j]; temp[j] = temp[j + 1]; temp[j + 1] = sw;
+            }
+
+    int current_t = 0, total_wt = 0, total_tat = 0, total_burst = 0;
+    int scheduled_count = 0;
+
+    for (int i = 0; i < process_count; i++) {
+        if (temp[i].state == TERMINATED) continue;   /* skip manual terminations */
+
+        if (current_t < temp[i].arrival_time)
+            current_t = temp[i].arrival_time;
+
+        /* READY -> RUNNING */
+        for (int k = 0; k < process_count; k++)
+            if (process_table[k].pid == temp[i].pid)
+                process_table[k].state = RUNNING;
+        add_log("PID %d (%s) -> RUNNING at t=%d", temp[i].pid, temp[i].name, current_t);
+
+        int wt  = current_t - temp[i].arrival_time;
+        current_t += temp[i].burst_time;
+        int tat = current_t - temp[i].arrival_time;
+        total_wt    += wt;
+        total_tat   += tat;
+        total_burst += temp[i].burst_time;
+        scheduled_count++;
+
+        /* RUNNING -> TERMINATED */
+        for (int k = 0; k < process_count; k++)
+            if (process_table[k].pid == temp[i].pid)
+                process_table[k].state = TERMINATED;
+        add_log("PID %d (%s): Waiting=%d, Turnaround=%d -> TERMINATED",
+                temp[i].pid, temp[i].name, wt, tat);
+    }
+
+    if (scheduled_count > 0) {
+        add_log("Average Waiting Time:    %.2f", (float)total_wt  / scheduled_count);
+        add_log("Average Turnaround Time: %.2f", (float)total_tat / scheduled_count);
+        add_log("CPU Utilization:         %.2f%%", (total_burst * 100.0) / current_t);
+    }
+    add_log("=== FCFS SCHEDULING COMPLETED ===");
+    display_process_table();
 
 
 }
 
 void priority_algo(void) {
-    return;
+    if (process_count == 0) {
+        add_log("ERROR: No processes to schedule");
+        return;
+    }
+    add_log("=== PRIORITY SCHEDULING STARTED ===");
+
+    PCB temp[MAX_PROCESSES];
+    memcpy(temp, process_table, sizeof(PCB) * process_count);
+
+    int to_schedule = 0;
+    for (int i = 0; i < process_count; i++)
+        if (temp[i].state != TERMINATED) to_schedule++;
+
+    int done[MAX_PROCESSES] = {0};
+    int current_t = 0, total_wt = 0, total_tat = 0, total_burst = 0;
+    int scheduled_count = 0;
+
+    while (scheduled_count < to_schedule) {
+
+        /* Step 1: find the highest-priority process that has arrived */
+        int best = -1;
+        for (int i = 0; i < process_count; i++) {
+            if (done[i] || temp[i].state == TERMINATED) continue;
+            if (temp[i].arrival_time <= current_t)
+                if (best == -1 || temp[i].priority < temp[best].priority)
+                    best = i;
+        }
+
+        /* Step 2: nothing arrived yet — advance to the earliest arrival */
+        if (best == -1) {
+            int earliest = -1;
+            for (int i = 0; i < process_count; i++) {
+                if (done[i] || temp[i].state == TERMINATED) continue;
+                if (earliest == -1 ||
+                    temp[i].arrival_time < temp[earliest].arrival_time)
+                    earliest = i;
+            }
+            if (earliest == -1) break;
+            current_t = temp[earliest].arrival_time;
+            for (int i = 0; i < process_count; i++) {
+                if (done[i] || temp[i].state == TERMINATED) continue;
+                if (temp[i].arrival_time <= current_t)
+                    if (best == -1 || temp[i].priority < temp[best].priority)
+                        best = i;
+            }
+        }
+        if (best == -1) break;
+        done[best] = 1;
+
+        /* READY -> RUNNING */
+        for (int k = 0; k < process_count; k++)
+            if (process_table[k].pid == temp[best].pid)
+                process_table[k].state = RUNNING;
+        add_log("PID %d (%s) Priority=%d -> RUNNING at t=%d",
+                temp[best].pid, temp[best].name, temp[best].priority, current_t);
+
+        int wt  = current_t - temp[best].arrival_time;
+        current_t += temp[best].burst_time;
+        int tat = current_t - temp[best].arrival_time;
+        total_wt    += wt;
+        total_tat   += tat;
+        total_burst += temp[best].burst_time;
+        scheduled_count++;
+
+        /* RUNNING -> TERMINATED */
+        for (int k = 0; k < process_count; k++)
+            if (process_table[k].pid == temp[best].pid)
+                process_table[k].state = TERMINATED;
+        add_log("PID %d (%s) Priority=%d: Waiting=%d, Turnaround=%d -> TERMINATED",
+                temp[best].pid, temp[best].name, temp[best].priority, wt, tat);
+    }
+
+    if (scheduled_count > 0) {
+        add_log("Average Waiting Time:    %.2f", (float)total_wt  / scheduled_count);
+        add_log("Average Turnaround Time: %.2f", (float)total_tat / scheduled_count);
+        add_log("CPU Utilization:         %.2f%%", (total_burst * 100.0) / current_t);
+    }
+    add_log("=== PRIORITY SCHEDULING COMPLETED ===");
+    display_process_table();
 }
 
                              // FILE MANAGEMENT
@@ -384,13 +514,13 @@ void clear_logs(void) {
                                 // MENU
 void display_menu(void) {
     printf("\n======================================================\n");
-    printf("              Emergency Response System G84              ");
+    printf("             Emergency Response System G84               \n");
     printf("======================================================\n");
     printf("  [Process Management]\n");
-    printf("  1. Create Emergency Task\n");
+    printf("  1. Create Emergency Process\n");
     printf("  2. Show Process Table\n");
-    printf("  6. Suspend Task\n");
-    printf("  7. Terminate Task\n");
+    printf("  6. Suspend Process\n");
+    printf("  7. Terminate Process\n");
     printf("\n  [CPU Scheduling]\n");
     printf("  4. Run FCFS Scheduling\n");
     printf("  5. Run Priority Scheduling\n");
@@ -409,14 +539,16 @@ int main() {
 
     init_memory();
     add_log("===== Emergency Response System Started G84 ====");
-    add_log("TOtal Available Memory: % KB", MAX_MEMORY);
+    add_log("Total Available Memory: %d KB", MAX_MEMORY);
 
     int option;
     do {
         display_menu();
         if (scanf("%d", &option) != 1) {
+            // Clear invalid input from buffer
+            flush_input();
             printf("Invalid input. Please enter a number.\n");
-            break;
+            continue;
         }
         switch (option) {
             case 1:  create_process();         
