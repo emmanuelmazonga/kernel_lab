@@ -237,7 +237,7 @@ void suspend_process(void) {
     }
     
     for (int i = 0; i < process_count; i++) {
-         if (process_table[i].pid != pid)
+         if (process_table[i].pid != pid)  // if not the entered pid, skip that process
             continue;
         if (process_table[i].state == TERMINATED) {
             add_log("[ERROR] PID %d is already TERMINATED - cannot suspend", pid);
@@ -255,6 +255,42 @@ void suspend_process(void) {
     }
     add_log("[ERROR] PID %d not found", pid);
 }
+
+// terminate a process
+void terminate_process(void) {
+    int pid;
+    printf("Enter PID to terminate: ");
+    if (scanf("%d", &pid) != 1) { // If the user types a valid integer, scanf returns 1
+        printf("Invalid Input.\n");
+        return;
+    }
+
+    for (int i = 0; i < process_count; i++) {
+         if (process_table[i].pid != pid)  // if not the entered pid, skip that process
+            continue;
+        
+        if (process_table[i].state == TERMINATED) {
+            add_log("[INFO] PID %d (%S) is already TERMINATED", pid, process_table[i].name);
+            return;
+        }
+
+        process_table[i].state = TERMINATED; // change state of process to terminate
+        
+        // release memory after termination
+        if (process_table[i].memory_start != -1) { // check if memory is allocated
+            free_memory(pid); // release the block associated with this PID.
+            process_table[i].memory_start = -1; //  marks the process as having no memory.
+            add_log("[INFO] MRMORY: RELEASED %d KB from PID %d (%S)",
+            process_table[i].memory_size, pid, process_table[i].name);
+        }
+
+        add_log("TERMINATED: PID %d (%s) removed from scheduler",
+             pid, process_table[i].name);
+        // display_process_table
+        //display_memory_map
+    }
+}
+                             // CPU SCHEDULING
 
                              // FILE MANAGEMENT
 // reads and display the log file   
@@ -331,19 +367,19 @@ int main() {
         if (scanf("%d", &option != 1))
             break;
         switch (option) {
-            case 1:  create_task();         
+            case 1:  create_process();         
                 break;
             case 2:  print_process_table(); 
                 break;
             case 3:  print_memory_map();    
                 break;
-            case 4:  run_fcfs();            
+            case 4:  fcfs_algo();            
                 break;
-            case 5:  run_priority();        
+            case 5:  priority_algo();        
                 break;
-            case 6:  suspend_task();        
+            case 6:  suspend_process();        
                 break;
-            case 7:  terminate_task();      
+            case 7:  terminate_process();      
                 break;
             case 8:  view_logs();           
                 break;
