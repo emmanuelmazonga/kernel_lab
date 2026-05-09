@@ -226,7 +226,35 @@ void create_process(void) {
     process_count++;
     //display processt table and memory map
 
-}                           
+} 
+
+void suspend_process(void) {
+    int pid;
+    printf("Enter PID to suspend: ");
+    if (scanf("%d", &pid) != 1) { // If the user types a valid integer, scanf returns 1
+        printf("Invalid Input.\n");
+        return;
+    }
+    
+    for (int i = 0; i < process_count; i++) {
+         if (process_table[i].pid != pid)
+            continue;
+        if (process_table[i].state == TERMINATED) {
+            add_log("[ERROR] PID %d is already TERMINATED - cannot suspend", pid);
+            return;
+        }
+
+        if (process_table[i].state == WAITING) {
+            add_log("[INFO] PID %d (%S) is already WAITING", pid, process_table[i].name);
+            return;
+        }
+        process_table[i].state == WAITING;
+        add_log("SUSPENDED: PID %d (%s) -> WAITING", pid, process_table[i].name);
+        // display_process_table
+        return;
+    }
+    add_log("[ERROR] PID %d not found", pid);
+}
 
                              // FILE MANAGEMENT
 // reads and display the log file   
