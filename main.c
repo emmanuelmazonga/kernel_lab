@@ -168,9 +168,46 @@ void free_memory(int pid) {
     }
 }
 
-// DISPLAY HELPERS
+// DISPLAY HELPERS ++
 
-
+                             // FILE MANAGEMENT
+// reads and display the log file   
+void view_logs(void) {
+    FILE* log_file = fopen(LOG_FILE, 'r');  // open log file in read mode'r'
+    if (!log_file) {
+        printf("[FILE ERROR] No Log file Found");
+        return;
+    }
+    printf("\n==================================================\n");
+    printf("|            MINI-OS  EVENT LOG                  |\n");
+    printf("==================================================\n");
+    char message_line[MESSAGE_SIZE];
+    int line_count = 0; // tracks how many lines are read
+    // Read each line from the file into message_line
+    while (fgets(message_line, sizeof(message_line), log_file)) {
+        printf("%S", message_line);
+        line_count++;
+    }
+    // if empty or show total events
+    if (line_count == 0){
+        printf("[FILE] Log file empty.\n");
+    }
+    else {
+        printf("\n Total events: %d\n", line_count);
+    }
+    // close log file
+    fclose(log_file);
+}
+// CLEAR LOG FILE
+void clear_logs(void) {
+    FILE* log_file = fopen(LOG_FILE, "w"); // open log file in write mode'w'
+    if (!log_file) {
+        printf("[FILE] Could not clear logs.\n");
+        return;
+    }
+    fclose(log_file);
+    printf("[FILE] Log cleared.\n");
+}
 
 
 
