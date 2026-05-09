@@ -1,20 +1,16 @@
-
-#include <windows.h>
-#include <process.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 #include <time.h>
+#include <stdarg.h>
 
-// CONSTANTS
-#define MAX_MEMORY      1024 // 1GB total ram
+// CONSTANTS USED IN THE PROGRAM
+#define MAX_MEMORY      1024 // 1MB total ram
 #define MAX_PROCESSES    20
-#define MAX_RESOURCES     5
 #define NAME_MAX_LEN     50
 #define MAX_MEMORY_BLOCKS   50 
 #define MESSAGE_SIZE      256
-#define LOG_FILE "logs\\os.log" 
-
+#define LOG_FILE "logs\\os.log"
 
 // STATES OF PROCESSES
 typedef enum {
@@ -23,214 +19,127 @@ typedef enum {
     RUNNING,
     WAITING,
     TERMINATED
-} ProcessState;
+} Process_state;
 
 // PROCESS CONTROL BLOCK (PCB)
 // This keeps track of the processes and their details
 typedef struct {
-    int     pid;
-    int     priority;
-    char    name[NAME_MAX_LEN];
-    ProcessState    state;
-    int     arrival_time;
-    int     burst_time;
-    int     remaining_time;
-    int     memory_required;
-    int     memory_start;
-    int     waiting_time;
-    int     turnaround_time;
-    int     allocated[MAX_RESOURCES];
-    int     max_needed[MAX_RESOURCES];
+    int pid;   // process ID
+    char name[NAME_MAX_LEN];
+    int arrival_time;
+    int burst_time;
+    int priority;
+    int remaining_time;
+    Process_state state;
+    int memory_size;  // This stores how much memory (in KB) the process when requested 
+    int memory_start; // This records the starting address of the memory block
 } PCB;
 
 // MEMORY BLOCK
 typedef struct {
-    int  start;
-    int  size;
+    int  start; // starting address of the memory block
+    int  size; // size of the memory block
     int  is_free;
     int  pid;       // -1 if free
 } MemoryBlock; 
-
+                       // GLOBAL STATE
 // PROCESS TABLE
 PCB process_table[MAX_PROCESSES];
 int process_count = 0;
 int next_pid = 1; // increasing counter — every new process gets the current value then increments it
                     //Generates unique process IDs (PIDs).
+
 // MEMORY BLOCK ++
-MemoryBlock memory[MAX_MEMORY_BLOCKS];
+MemoryBlock mem_blocks[MAX_MEMORY_BLOCKS];
 int count_block = 0;
 
-void log_event(const char* message);
-
-const char* state_to_string(ProcessState state_value) {
+// DIsplay Helpers
+const char* state_to_string(Process_state state_value) {
     switch (state_value) {
-        case NEW: return "NEW";
-        case READY: return "READY";
-        case RUNNING: return "RUNNING";
-        case WAITING: return "WAITING";
-        case TERMINATED: return "TERMINATED";
-        default: return "STATE UNKNOWN";
+        case NEW:
+            return "NEW";
+        case READY:
+            return "READY";
+        case RUNNING:
+            return "RUNNING";
+        case WAITING: 
+            return "WAITING";
+        case TERMINATED: 
+            return "TERMINATED";
+        default: 
+            return "STATE UNKNOWN";
     }
 }
 
-void flush_input(void) {
-    int key_char;
-    while ((key_char = getchar()) != '\n' && key_char != EOF);
-}
-// PROCESS MANAGEMENT
-// CREATING A PROCESS
-void create_process(void){
-    if (process_count >= MAX_PROCESSES) {
-        printf("\n[PROCESS] ERROR: Process Table FULL.\n");
-        return;
-    }
-    PCB* p = &process_table[process_count];
-    p->pid = next_pid++;
+                          // FILE MANAGEMENT
+// LOGGING
+void add_log(const char *message, ...) {
+    char message[500];        // buffer to hold the final message
+    va_list args;             // special type for handling "..."
+    va_start(args, message);   // initialize args to start reading after 'format'
+    vsnprintf(message, sizeof(message), message, args); 
+    va_end(args);             // clean up
 
-    // prompt the user for the name of the process
-    printf("\nEnter name of process: ");
-    flush_input();
-    fgets(p->name, NAME_MAX_LEN, stdin);
-    p->name[strcspn(p->name, "\n")] = '\0';
-
-    printf("\nEnter arrival_time: ");
-    scanf("%d" , &p->arrival_time);
-
-    // prompting for burst time
-    printf("\nEnter burst time: ");
-    scanf("%d" , &p->burst_time);
-
-    printf("\nEnter the Priority value. (1. Highest, 2. Medium, 3. Low): ");
-    scanf("%d" , &p->priority);
-
-    printf("\nEnter the memory required: ");
-    scanf("%d" , &p->memory_required);
-
-    p->state    = READY;
-    p->waiting_time    = 0;
-    p->turnaround_time  = 0;
-    p->memory_start = -1; 
-
-    // increment process count
-    process_count++;
-
-    // add log message to log file 
-    char log_message[MESSAGE_SIZE];
-    snprintf(log_message, sizeof(log_message),
-    // snprintf → formats text into a buffer (msg) safely,
-    // ensuring it doesn't overflow.
-        "Process Created: PID = %d | %s | priority = %d | Busrt_t = %d | Mem = %d |",
-        p->pid,
-        p->name,
-        p->priority,
-        p->burst_time,
-        p->memory_required
-    );
-
-    //logging the message
-    log_event(log_message);
-    printf("\n[SUCCESSFUL] '%s' created — PID '%d' | State: READY\n", p->name, p->pid);
-}
-
-
-void display_process_table(void) {
-    if (process_count == 0) {
-        printf("\n[PROCESS] No processes in the system.\n");
-        return;
-    }
-
-    printf("\n+---+------+------------------+-----+----------+---------+---------+\n");
-    printf("|  #| PID  | Name             | Pri | State    |   Burst | Mem(MB) |\n");
-    printf("+---+------+------------------+-----+----------+---------+---------+\n");
-
-    for (int i = 0; i < process_count; i++) {
-        PCB* p = &process_table[i];  
-        printf("| %d | %4d | %-16s | %3d | %-8s | %2d | %7d |\n",
-            i + 1,
-            p->pid,
-            p->name,
-            p->priority,
-            state_to_string(p->state),
-            p->burst_time,
-            p->memory_required);           
-    }
-    printf("+---+------+------------------+-----+----------+---------+---------+\n");
-}
-
-void log_event(const char* message) {
-    FILE* log_file = fopen(LOG_FILE, "a");
-    if (!log_file) return;
-
+    // Time handling
     time_t current_real_time = time(NULL);
     struct tm* time_info = localtime(&current_real_time);
     char time_string[60];
     strftime(time_string, sizeof(time_string), "%Y-%m-%d %H:%M:%S", time_info);
-
-    fprintf(log_file, "[%s] %s\n", time_string, message);
-    fclose(log_file);
-}
- // LOGGING FUNCTIONS
-void view_logs(void) {
-    FILE* log_file = fopen(LOG_FILE, "r");
-    if (!log_file) {
-        printf("[FILE ERROR] No log filr found.\n");
-        return;
-    }
-
-    printf("\n==================================================\n");
-    printf("|                   MINI-OS  EVENT LOG             |\n");
-    printf("\n==================================================\n");
-
-    char message_line[512];
-    int line_count = 0;
-    while (fgets(message_line, sizeof(message_line), log_file)){
-        printf(" %s", message_line);
-        line_count++;
-    }
-    if (line_count == 0 ) {
-        printf("[FILE] Log file Empty.");
-    }
-    else {
-        printf("\n  Total events: %d\n", line_count);
+    // Print to console
+    printf("[%s] %s\n", time_string, message);
+    // Append to log file
+    FILE *log_file = fopen(LOG_FILE, "a");
+    if (log_file) {
+        fprintf(log_file, "[%s] %s\n", time_string, message);
         fclose(log_file);
+    } else {
+        printf("[FILE ERROR] Could not write to log file.\n");
     }
-}
-
-void clear_logs(void) {
-    FILE* log_file = fopen(LOG_FILE, "w");
-    if (!log_file) { printf("[FILE] Could not clear logs.\n"); return; }
-    fclose(log_file);
-    printf("[FILE] Log cleared.\n");
-}
-
-
-
-
-//MAIN 
-int main(){
-
-
-    return 0;
-}
-
-
-
-// INITIALIZING THE MEMORY
-void init_memory(void){
-    memory[0].start     = 0;
-    memory[0].size      = MAX_MEMORY;
-    memory[0].is_free   = 1;
-    memory[0].pid       = -1;
-    count_block         = 1;
-}
- 
-
-static void split_block(int index, int memory_required, int pid) {
-    int leftover_Memory = memory[index].size - memory_required;
-
-    memory[index].size    = memory_required;
-    memory[index].is_free = 0;
-    memory[index].pid     = pid;
-
     
+}
+
+
+                       // MEMORY MANAGEMENT
+void init_memory(void) {
+    mem_blocks[0].start = 0;          // block will begin at address 0 KB
+    mem_blocks[0].size  = MAX_MEMORY; // to start with, the block covers the entire memory (1024 KB)
+    mem_blocks[0].pid   = -1;         // -1 means "free" (no process owns it, yet)
+    count_block = 1;               // only one block exists right now, the 1024KB block
+}
+
+// Strategy to be used: First-Fit allocation
+/* First-Fit: scan for the first block large enough; split if necessary.
+Returns the start address of the allocated region, or -1 on failure. */
+
+int first_fit_allocate(int size, int pid) {
+    for (int i = 0; i < count_block; i++) {
+        // checking if the block is free && if the avalaible space is enough for the the requested space
+        if (mem_blocks[i].pid == -1 && mem_blocks[i].size >= size) {
+            // Save its starting address (alloc_start)
+            int alloc_start = mem_blocks[i].start;
+            if (mem_blocks[i].size > size ){
+                //split and shift everything right to make room for the remainder
+                for (int j = count_block; j > i; j--) {
+                    mem_blocks[j] = mem_blocks[j - 1];
+                }
+                mem_blocks[i + 1].start = alloc_start + size;
+                mem_blocks[i + 1].size  = mem_blocks[i].size - size;
+                mem_blocks[i + 1].pid   = -1;
+                count_block++;
+            }
+            mem_blocks[i].size = size;
+            mem_blocks[i].pid  = pid;
+            return alloc_start;
+        }
+    }
+    return -1; // allocation failed
+}
+
+
+
+
+
+
+int main() {
+    return 0;
 }
